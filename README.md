@@ -1,7 +1,3 @@
-Copy everything between the two lines below:
-
----
-
 CTST Sudoku Solver — Cell-to-Symbol Tally for Generalised N×N Sudoku
 
 A practical, lightweight constraint-propagation solver for generalised Sudoku puzzles (ranks 3–20+), implementing the **Cell-to-Symbol Tally (CTST)** method described in:
