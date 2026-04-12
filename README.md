@@ -1,190 +1,196 @@
-CTST Sudoku Solver — Cell-to-Symbol Tally for Generalised N×N Sudoku
+# CTST Sudoku — GSV (Generate · Solve · Verify)
 
-A practical, lightweight constraint-propagation solver for generalised Sudoku puzzles (ranks 3–20+), implementing the **Cell-to-Symbol Tally (CTST)** method described in:
+C++ implementation of the Cell-to-Symbol Tally method for generalised N×N Sudoku.  
+This repository contains the **GSV project**: it generates a puzzle, solves it using the CTST filtering and prediction pipeline (cross-checking against a pre-built reference solution), and collects the statistics reported in the paper.
 
-> *A Cell-to-Symbol Tally Approach for the ≤3-Candidate Subclass of Generalised Sudoku* — Shiv Bali
-
----
-
-Overview
-
-Standard Sudoku solvers rely on global matching (bipartite graphs, SAT encodings) or pure backtracking. CTST takes a different approach: it isolates and directly operationalises two structural regimes that existing methods handle only implicitly:
-
-- **Near-tight subsets** (`s−c = 1`) — handled by Rule 8, a dedicated lightweight filter
-- **Symbol-first tight detection** — handled by Rule 7, a bound-sets accumulation algorithm
-
-Within the **≤3-Candidate Class** (puzzles where at every deterministic fixed point at least one cell has ≤3 candidates), CTST solves puzzles from 9×9 up to 400×400 without requiring bipartite matching or clause learning.
+> **Coming in Version 2 — Independent Solver**  
+> A standalone solver with no reference solution, plus runtime comparisons against DLX and SAT baselines across ranks 3–20. See [Planned: Independent Solver](#planned-independent-solver) below.
 
 ---
 
-Features
+## Build
 
-- **Eight deterministic filtering rules** (Rules 1–8) applied in a first-trigger priority pipeline
-- **Predict-and-rectify** with conflict-directed backjumping and hint-preserving rollback
-- **Scales to rank 20** (400×400 grids, 160,000 cells)
-- Puzzle input via tab-separated text files; works for any rank where `N = n²`
+```bash
+# Compile all source files together (GCC example)
+g++ -O2 -o gsv \
+    Sudoku_Main.cpp \
+    Build_options_table.cpp \
+    Create_sudoku_M1.cpp \
+    Create_sudoku_M2.cpp \
+    Create_sudoku_M3.cpp \
+    Create_sudoku_M4.cpp \
+    P_filter_symbol_cts_methods.cpp \
+    P_filter_symbol_condition_1.cpp \
+    P_filter_symbol_condition_2.cpp \
+    P_filter_symbol_condition_3.cpp \
+    P_filter_symbol_condition_4.cpp \
+    P_filter_symbol_condition_5.cpp \
+    P_filter_symbol_condition_6.cpp \
+    P_filter_symbol_condition_7.cpp \
+    P_predict_symbol.cpp \
+    P_check_process_halt.cpp \
+    three_way_sort.cpp \
+    -lm
 
----
-
-The Eight Rules
-
-| Rule | Name | Regime | Direction |
-|------|------|--------|-----------|
-| 1 | Naked Singles | Single cell | Cell → Value |
-| 2 | Hidden Singles | Single symbol per unit | Symbol → Cell |
-| 3 | Naked Pairs *(fast-path)* | Two-cell tight (`k=2` case of Rule 5) | Cell → Symbol |
-| 4 | Pointing Pairs / Box-Line Reduction | Row/col × block intersection | Symbol → Block |
-| 5 | Ascending Tally | Tight subsets, all sizes (naked) | Cell → Symbol |
-| 6 | Descending Tally | Tight subsets, all sizes (hidden) | Cell → Symbol |
-| 7 | Bound-Sets Filter | Tight, symbol-first accumulation | Symbol → Cell |
-| 8 | Near-Tight Analysis | Near-tight (`s−c = 1`) | Cell → Symbol |
-
-Rules execute in order. Any elimination restarts from Rule 1 (first-trigger restart).
-
----
-
-Repository Structure
-
-ctst-sudoku/
-├── src/
-│   └── ctst_solver.cpp
-├── puzzles/
-│   ├── sample_9x9.txt
-│   ├── sample_16x16.txt
-│   └── sample_81x81.txt
-├── paper/
-│   └── CTST_preprint.pdf
-└── README.md
+./gsv
+```
 
 ---
 
-Building
+## Running
 
-Requires C++14 or later. Tested with GCC 9+, Clang 10+, and MSVC 2015+.
+The program runs interactively from the console.
 
-**GCC / Clang**
+**Step 1 — Enter rank**
+```
+Enter rank of sudoku
+starting with number 3
+rank 3 generates 9x9 grid sudoku
+rank 4 generates 16x16 grid sudoku and so on
+```
 
-g++ -std=c++14 -O2 -o ctst_solver src/ctst_solver.cpp
+**Step 2 — Choose puzzle difficulty (key-cell count)**
+```
+Enter :1   For Number of key cells - Zero
+Enter :2   For Number of key cells - Less than N       (minimum key cells)
+Enter :3   For Number of key cells - Greater than N    (maximum key cells, partial implementation)
+Enter :4   For completely random initial symbol placement
+```
 
-**MSVC (Developer Command Prompt)**
+The solver then generates the puzzle, solves it, prints statistics, and writes two output files to the working directory:
+- `s2.txt` — the generated puzzle (empty cells as 0)
+- `solution.txt` — the reference solution
 
-cl /std:c++14 /O2 /EHsc src\ctst_solver.cpp
-
-**Visual Studio (GUI)**
-1. File → New → Project → Console App (C++)
-2. Add the .cpp file
-3. Project → Properties → C/C++ → Language → ISO C++14
-4. Project → Properties → C/C++ → Optimization → Maximize Speed (/O2)
-5. Build Solution (F7)
-
----
-
-Puzzle File Format
-
-Tab-separated values, one row per line, 0 for empty cells. Values 1 to N, where N is the grid side length.
-
-- 9×9: 9 rows × 9 values
-- 16×16: 16 rows × 16 values
-- 81×81: 81 rows × 81 values
+For rank 3 (9×9), the puzzle board, solution board, and options table are also printed to the console.
 
 ---
 
-Running
+## How the GSV Pipeline Works
 
-./ctst_solver puzzle.txt
+```
+Generate → Solve (with reference check) → Print statistics
+```
 
-The solver prints a progress display during solving and outputs the completed grid on success.
+### 1. Generate
 
----
+One of four generation methods is called based on the user's choice:
 
-Performance
+| Option | Function | What it produces |
+|---|---|---|
+| 1 | `m1_GENERAT_SUDOKU_METHOD` | Zero key cells — fully deterministic solve possible |
+| 2 | `m2_GENERAT_SUDOKU_METHOD` | Minimum key cells — few predictions needed |
+| 3 | `m3_GENERAT_SUDOKU_METHOD` | Maximum key cells — many predictions needed |
+| 4 | `m4_GENERAT_SUDOKU_METHOD` | Random initial placement |
 
-The detailed per-rank performance tables are provided in Appendix B of the paper.
+Each method builds a complete solution (`s_table`), then removes symbols to create the puzzle (`p_table`).
 
-**Important limitation of the reported benchmarks:** The performance data in the paper was collected without the full autonomous error rectification procedure. Whenever a prediction error occurred during benchmarking, rectification was performed by comparing against a pre-computed known solution rather than by the solver's internal conflict-directed backjumping mechanism. The reported solve times therefore reflect the deterministic phase and prediction costs accurately, but do not fully capture the overhead of autonomous error rectification on harder instances.
+### 2. Solve
 
-**An independent solver with the complete error rectification procedure implemented will be uploaded to this repository shortly.** Benchmarks obtained with that version will supersede the figures in the paper for the prediction phase.
+`SOLVE_SUDOKU` runs the CTST pipeline to fill in empty cells and collect statistics:
 
-Summary (deterministic phase, no prediction errors):
+```
+build_options_table()           ← initialise candidate sets (p_OT)
+filter_symbol_cts_method()      ← run Rules 1–8 to deterministic fixed point
+while not complete:
+    predict_symbol()            ← pick key cell, guess a value (cross-check with s_table)
+    filter_symbol_cts_method()  ← propagate after prediction
+    check_process_halt()        ← test for completion or stuck state
+verify_result()                 ← confirm solution matches s_table
+print_message_2()               ← print statistics
+```
 
-| Grid | 9×9 | 16×16 | 25×25 | 49×49 | 64×64 | 81×81 |
-|------|-----|-------|-------|-------|-------|-------|
-| Samples | 50 | 50 | 50 | 50 | 20 | 20 |
-| Avg. solve time (s) | 0.001 | 0.01 | 0.25 | 0.35 | 1 | 3 |
+> **Note on verification:** In this GSV version the solver uses `s_table` (the reference solution) to verify each prediction. This is what makes it a *data-collection* tool rather than an independent solver — errors are detected by comparison, not by structural inconsistency alone.
 
----
+### 3. Statistics printed
 
-Algorithmic Details
-
-**Complexity**
-
-| Phase | Complexity |
-|-------|------------|
-| Single convergence pass (Rules 1–4) | O(N³√N) |
-| Single convergence pass (Rules 5–8, dominant) | O(N⁵) |
-| Full deterministic phase | O(R·N⁵), R small in practice |
-| Per prediction step | O(N⁵) |
-| Full solve (K prediction steps) | O(K·N⁵) |
-| Space | O(N³) |
-
-In practice K ≪ N²: median K = 2 on standard 9×9 puzzles; K ≈ 12,859 at rank 18 (324×324), roughly 1/8 of N².
-
-**Predict-and-Rectify**
-
-When the deterministic phase reaches a fixed point, the solver selects the cell with the fewest candidates (≤3 within the tested class) and predicts a value. Errors are detected via Rule 8 Case B, Rules 5–6 singleton collision, and the consistency condition P_et[i,j] ⊄ P_ps[i,j]. On error, conflict-directed backjumping traces triggerLv records to the originating prediction. Symbols predicted after the root cause are saved as hints and replayed after rollback.
-
-**≤3-Candidate Class**
-
-CTST is designed for the ≤3-Candidate Class: puzzles where, at every deterministic fixed point requiring prediction, at least one unresolved cell has ≤3 candidates. This is a class-defining assumption. If no such cell exists, the solver halts and reports a class-membership failure rather than predicting from a larger set. No class-membership failure was encountered across all tested instances (ranks 3–20).
-
----
-
-Rule 8 — Near-Tight Analysis
-
-Rule 8 is the primary novel contribution. It targets near-tight groups (s−c = 1) — configurations where a set of c cells has exactly c+1 distinct candidate symbols — and provides a dedicated lightweight procedure not identified in the surveyed constraint-propagation literature.
-
-An exhaustive search of AAAI, IJCAI, CP, ECAI, the Constraints journal, and the Artificial Intelligence journal (1994–2024) found no prior work with a dedicated algorithm for this regime. Existing methods (e.g. Régin's GAC algorithm) subsume its deductions but handle the near-tight case only implicitly within a full matching pass.
-
-Case table:
-
-| Case | solo(c) distribution | Outcome |
-|------|----------------------|---------|
-| B | Any cell: solo > 2 | Immediate error → rollback |
-| A-resolve | Exactly one c* with solo = 2; qualifying 2-element right-side cell found | Filter: remove surplus, collapse to tight subset |
-| A-error | Both singletons have qualifying right-side cells simultaneously | Immediate error → rollback |
-| A-key | Exactly one c* with solo = 2; no qualifying right-side cell | Add c* to prediction queue |
-| D | No cell with solo ≥ 2 | Skip — insufficient information |
+```
+Puzzle has unique / multiple solution
+Number of empty cells to be filled
+Number of key cells (predictions made)
+Number of cells filled by CELL TO SYMBOL TALLY method
+Number of symbol prediction errors
+Elapsed time
+```
 
 ---
 
-Ablation Study: Rules 7 and 8
+## Source File Reference
 
-Removing Rules 7 and 8 causes:
+### Entry point and orchestration
 
-- M4 (Naked Pair) ↑ — 29% increase in 49×49 (88,364 → 113,884)
-- M7 (Tight Group) ↓ — 67% reduction in 49×49 (32,428 → 10,450)
-- Increased computation at lower-order stages, reduced structured inference
+| File | Role |
+|---|---|
+| `Sudoku_Main.cpp` | `main()`, `SOLVE_SUDOKU()`, `check_process_halt()`, display and file I/O |
 
-This confirms that Rules 7 and 8 are not cosmetic — they compress candidate structures in ways that enable the tally rules (5–6) to operate effectively.
+### Headers
+
+| File | Declares |
+|---|---|
+| `gsv.h` | Generation method signatures, display/file utilities |
+| `filters.h` | All 8 filter functions + `predict_symbol()` |
+
+### Puzzle generation
+
+| File | Method |
+|---|---|
+| `Create_sudoku_M1.cpp` | M1 — zero key cells |
+| `Create_sudoku_M2.cpp` | M2 — minimum key cells |
+| `Create_sudoku_M3.cpp` | M3 — maximum key cells |
+| `Create_sudoku_M4.cpp` | M4 — random placement |
+
+### CTST filtering (Rules 1–8)
+
+| File | Rule | Function |
+|---|---|---|
+| `Build_options_table.cpp` | Init | `build_options_table()` — build candidate sets from the puzzle board |
+| `P_filter_symbol_cts_methods.cpp` | Pipeline | `filter_symbol_cts_method()` — runs all rules in order; restarts from Rule 1 on any elimination |
+| `P_filter_symbol_condition_1.cpp` | Rule 1 | Naked Singles — `initialise_insert_symbol_into_puzzle_table()` |
+| `P_filter_symbol_condition_2.cpp` | Rule 2 | Hidden Singles — `find_hidden_symbol()` |
+| `P_filter_symbol_condition_3.cpp` | Rule 3 | Naked Pairs (fast path) — `find_twin_set()` |
+| `P_filter_symbol_condition_4.cpp` | Rule 4 | Pointing Pairs / Box-Line Reduction — `filter_block_symbol()` |
+| `P_filter_symbol_condition_5.cpp` | Rule 5 | Ascending Tally (Naked Subsets) — `find_n_symbol_n_cell_tally_asc()` |
+| `P_filter_symbol_condition_6.cpp` | Rule 6 | Descending Tally (Hidden Subsets) — `find_n_symbol_n_cell_tally_dsc()` |
+| `P_filter_symbol_condition_7.cpp` | Rule 7 | Bound-Sets Filter — `remove_invalid_options_from_bound_cells()` |
+| `P_filter_symbol_cts_methods.cpp` | Rule 8 | Near-Tight Analysis — `filter_symbol_sets_group_method()` |
+
+### Prediction and control
+
+| File | Role |
+|---|---|
+| `P_predict_symbol.cpp` | `predict_symbol()` — selects key cell, tries candidates using 17 ordering conditions, cross-checks with `s_table` |
+| `P_check_process_halt.cpp` | `check_process_halt()` — checks whether all cells are resolved or the solver is stuck |
+| `three_way_sort.cpp` | Sort utility used by the tally rules |
 
 ---
 
-References
+## Key Data Structures
 
-1. T. Yato and T. Seta, "Complexity and completeness of finding another solution," IEICE Trans. Fundamentals, vol. E86-A, no. 5, pp. 1052–1060, 2003.
-2. P. Norvig, "Solving every Sudoku puzzle," 2006. https://norvig.com/sudoku.html
-3. J.-C. Régin, "A filtering algorithm for constraints of difference in CSPs," in Proc. AAAI-94, pp. 362–367, 1994.
-4. P. Hall, "On representatives of subsets," Journal of the London Mathematical Society, vol. 10, pp. 26–30, 1935.
-5. G. Royle, "Minimum Sudoku — 17-clue puzzle corpus," University of Western Australia. http://staffhome.ecm.uwa.edu.au/~00013890/sudokumin.php
-
----
-
-Author
-
-Shiv Bali — shiv.somappa@gmail.com
+```cpp
+int**  p_table           // puzzle board      [size][size]
+int**  s_table           // reference solution [size][size]  ← used for prediction verification in GSV
+int**  t_table           // temp board for statistics collection [size][size]
+int*** p_OT              // candidate (options) table [size][size][size+5]
+                         // p_OT[i][j][0]      = number of remaining candidates for cell (i,j)
+                         // p_OT[i][j][1..N]   = candidate symbols
+                         // p_OT[i][j][N+1..N+4] = metadata (prediction ID, trigger level, etc.)
+```
 
 ---
 
-License
+## Planned: Independent Solver
 
-This project is released for academic and research use. Please cite the accompanying paper if you use this code or method in your work.
+Version 2 of this project will replace the reference-solution cross-check with full autonomous error detection and backjumping, making it a true standalone solver. Planned additions:
+
+- [ ] `p_ET` and `p_PS` dual-table consistency check (Definition 7 in paper)
+- [ ] `triggerLv` conflict-directed backjumping — no reference solution needed
+- [ ] Hint-preserving rollback
+- [ ] Rule 8 extended to s−c ≥ 3
+- [ ] Runtime comparison against DLX and SAT baselines across ranks 3–20
+- [ ] Ranks 19–20 maximum-key-cell benchmarks
+
+---
+
+## Reference
+
+*A Cell-to-Symbol Tally Approach for Generalised Sudoku* — Shiv Bali, April 2026  
+Contact: shiv.somappa@gmail.com
