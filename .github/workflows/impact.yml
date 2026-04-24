@@ -1,29 +1,58 @@
-- name: Store history
-  run: |
-    mkdir -p data
+name: Store GitHub Traffic
 
-    DATE=$(date +'%Y-%m-%d')
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
 
-    VIEWS=$(jq '.count // 0' views.json)
-    UNIQUE_VIEWS=$(jq '.uniques // 0' views.json)
+permissions:
+  contents: write
 
-    CLONES=$(jq '.count // 0' clones.json)
-    UNIQUE_CLONES=$(jq '.uniques // 0' clones.json)
+jobs:
+  traffic:
+    runs-on: ubuntu-latest
 
-    # Always append a row
-    echo "$DATE,$VIEWS,$UNIQUE_VIEWS,$CLONES,$UNIQUE_CLONES" >> data/traffic_history.csv
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # Show file content for debug
-    cat data/traffic_history.csv
+      - name: Fetch GitHub traffic
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/shivsomappa/ctst-generalised-sudoku/traffic/views \
+          > views.json
 
-- name: Commit changes
-  run: |
-    git config --global user.name "github-actions"
-    git config --global user.email "actions@github.com"
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/shivsomappa/ctst-generalised-sudoku/traffic/clones \
+          > clones.json
 
-    git add data/traffic_history.csv
+      - name: Store history
+        run: |
+          mkdir -p data
 
-    # Force commit even if Git thinks nothing changed
-    git commit -m "Update traffic history" || echo "No changes to commit"
+          # Ensure header exists
+          if [ ! -f data/traffic_history.csv ]; then
+            echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
+          fi
 
-    git push
+          DATE=$(date +'%Y-%m-%d')
+
+          VIEWS=$(jq '.count // 0' views.json)
+          UNIQUE_VIEWS=$(jq '.uniques // 0' views.json)
+
+          CLONES=$(jq '.count // 0' clones.json)
+          UNIQUE_CLONES=$(jq '.uniques // 0' clones.json)
+
+          echo "$DATE,$VIEWS,$UNIQUE_VIEWS,$CLONES,$UNIQUE_CLONES" >> data/traffic_history.csv
+
+          echo "---- CSV CONTENT ----"
+          cat data/traffic_history.csv
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add data/traffic_history.csv
+          git commit -m "Update traffic history" || echo "No changes to commit"
+          git push
