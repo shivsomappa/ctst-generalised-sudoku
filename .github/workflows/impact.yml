@@ -1,0 +1,34 @@
+name: Fetch Traffic History
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+jobs:
+  fetch-traffic:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Fetch traffic data
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: |
+          curl -H "Authorization: token $GH_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               https://api.github.com/repos/${{ github.repository }}/traffic/views \
+               -o traffic_raw.json
+      - name: Convert to CSV
+        run: |
+          mkdir -p data
+          echo "date,views,unique_visitors" > data/traffic_history.csv
+          jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' \
+             traffic_raw.json >> data/traffic_history.csv
+      - name: Commit CSV to repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/traffic_history.csv
+          git commit -m "Update traffic history" || echo "No changes to commit"
+          git push
