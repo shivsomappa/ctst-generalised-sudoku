@@ -1,0 +1,49 @@
+name: Store GitHub Traffic
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # runs daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  traffic:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Fetch GitHub traffic
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/shivsomappa/ctst-generalised-sudoku/traffic/views \
+          > views.json
+
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          https://api.github.com/repos/shivsomappa/ctst-generalised-sudoku/traffic/clones \
+          > clones.json
+
+      - name: Store history in CSV
+        run: |
+          mkdir -p data
+
+          DATE=$(date +'%Y-%m-%d')
+
+          VIEWS=$(jq '.count' views.json)
+          UNIQUE_VIEWS=$(jq '.uniques' views.json)
+
+          CLONES=$(jq '.count' clones.json)
+          UNIQUE_CLONES=$(jq '.uniques' clones.json)
+
+          echo "$DATE,$VIEWS,$UNIQUE_VIEWS,$CLONES,$UNIQUE_CLONES" >> data/traffic_history.csv
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add data/traffic_history.csv
+          git commit -m "Update traffic history" || echo "No changes"
+          git push
