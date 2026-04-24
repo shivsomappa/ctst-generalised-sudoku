@@ -1,11 +1,36 @@
-name: Test Workflow
+name: Store GitHub Traffic
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  test:
+  traffic:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Run test
-        run: echo "Workflow working"
+      - uses: actions/checkout@v3
+
+      - name: Write test data
+        run: |
+          mkdir -p data
+
+          # Always create file fresh
+          echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
+
+          DATE=$(date +'%Y-%m-%d')
+
+          echo "$DATE,5,5,5,5" >> data/traffic_history.csv
+
+          cat data/traffic_history.csv
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add data/traffic_history.csv
+          git commit -m "Update traffic history" || echo "No changes"
+          git push
