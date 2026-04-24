@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 jobs:
   fetch-traffic:
     runs-on: ubuntu-latest
@@ -10,7 +12,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
       - name: Fetch traffic data
         env:
           GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
