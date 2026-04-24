@@ -2,18 +2,15 @@ name: Fetch Traffic History
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # runs daily at midnight
-
+    - cron: '0 0 * * *'
 jobs:
   fetch-traffic:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # needed to commit the CSV back to the repo
-
+      contents: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Fetch traffic data
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -22,13 +19,11 @@ jobs:
                -H "Accept: application/vnd.github+json" \
                https://api.github.com/repos/${{ github.repository }}/traffic/views \
                -o traffic_raw.json
-
       - name: Convert to CSV
         run: |
           echo "date,views,unique_visitors" > traffic_history.csv
           jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' \
              traffic_raw.json >> traffic_history.csv
-
       - name: Commit CSV to repo
         run: |
           git config user.name "github-actions"
