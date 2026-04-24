@@ -10,21 +10,28 @@ jobs:
       contents: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Fetch traffic data
         env:
           GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
         run: |
-          curl -H "Authorization: token $GH_TOKEN" \
+          curl -f -H "Authorization: token $GH_TOKEN" \
                -H "Accept: application/vnd.github+json" \
                https://api.github.com/repos/${{ github.repository }}/traffic/views \
                -o traffic_raw.json
+          echo "--- RAW API RESPONSE ---"
+          cat traffic_raw.json
       - name: Convert to CSV
         run: |
           mkdir -p data
           echo "date,views,unique_visitors" > data/traffic_history.csv
-          jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' \
-             traffic_raw.json >> data/traffic_history.csv
+          if jq -e '.views | length > 0' traffic_raw.json > /dev/null; then
+            jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' \
+               traffic_raw.json >> data/traffic_history.csv
+          else
+            echo "No traffic data returned from API"
+          fi
+          cat data/traffic_history.csv
       - name: Commit CSV to repo
         run: |
           git config user.name "github-actions"
