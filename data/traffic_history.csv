@@ -1,3 +1,1 @@
-git add data/traffic_history.csv
-git commit -m "Initial traffic history file"
-git push
+date,views,unique_views,clones,unique_clones
