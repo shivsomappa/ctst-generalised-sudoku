@@ -1,10 +1,13 @@
 name: Fetch Traffic History
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'   # runs daily at midnight UTC
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   fetch-traffic:
     runs-on: ubuntu-latest
@@ -13,6 +16,7 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
       - name: Fetch traffic data
         env:
           GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
@@ -23,6 +27,16 @@ jobs:
                -o traffic_raw.json
           echo "--- RAW API RESPONSE ---"
           cat traffic_raw.json
+
+      - name: Debug API response
+        env:
+          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
+        run: |
+          echo "Response headers:"
+          curl -I -H "Authorization: token $GH_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               https://api.github.com/repos/${{ github.repository }}/traffic/views
+
       - name: Convert to CSV
         run: |
           mkdir -p data
@@ -34,6 +48,7 @@ jobs:
             echo "No traffic data returned from API"
           fi
           cat data/traffic_history.csv
+
       - name: Commit CSV to repo
         run: |
           git config user.name "github-actions"
