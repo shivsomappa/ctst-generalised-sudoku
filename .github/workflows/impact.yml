@@ -1,7 +1,7 @@
 name: Fetch Traffic History
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # manual trigger
   schedule:
     - cron: '0 0 * * *'   # runs daily at midnight UTC
 
@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # future-proof Node.js warning
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -41,30 +43,20 @@ jobs:
           mkdir -p data
           echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
 
-          # Merge daily records by date
-          jq -s '
-            def to_map(stream; key): stream | map({(.[key]): .}) | add;
-            (.[0].views | map({date: .timestamp, views: .count, unique_views: .uniques}))
-            as $views
-            | (.[1].clones | map({date: .timestamp, clones: .count, unique_clones: .uniques}))
-            as $clones
-            | ($views | to_map("date")) as $vmap
-            | ($clones | to_map("date")) as $cmap
-            | ($vmap + $cmap)
-            | to_entries
-            | sort_by(.key)
-            | map([.key, (.value.views // ""), (.value.unique_views // ""), (.value.clones // ""), (.value.unique_clones // "")])
-            | .[]
-            | @csv
-          ' traffic_raw.json clones_raw.json >> data/traffic_history.csv
+          # Write daily views
+          jq -r '.views[] | [.timestamp, .count, .uniques, "", ""] | @csv' traffic_raw.json >> data/traffic_history.csv
 
-          # Add a summary row with totals
+          # Write daily clones
+          jq -r '.clones[] | [.timestamp, "", "", .count, .uniques] | @csv' clones_raw.json >> data/traffic_history.csv
+
+          # Add totals row
           views_total=$(jq '.count' traffic_raw.json)
           views_uniques=$(jq '.uniques' traffic_raw.json)
           clones_total=$(jq '.count' clones_raw.json)
           clones_uniques=$(jq '.uniques' clones_raw.json)
           echo "TOTAL,$views_total,$views_uniques,$clones_total,$clones_uniques" >> data/traffic_history.csv
 
+          echo "--- FINAL CSV ---"
           cat data/traffic_history.csv
 
       - name: Commit CSV to repo
