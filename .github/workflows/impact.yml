@@ -1,4 +1,4 @@
-- name: Convert to CSV
+ name: Convert to CSV
   run: |
     mkdir -p data
     echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
