@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: write
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # silence Node.js 20 warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -43,10 +43,10 @@ jobs:
           mkdir -p data
           echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
 
-          # Write daily views
+          # Dump views rows
           jq -r '.views[] | [.timestamp, .count, .uniques, "", ""] | @csv' traffic_raw.json >> data/traffic_history.csv
 
-          # Write daily clones
+          # Dump clones rows
           jq -r '.clones[] | [.timestamp, "", "", .count, .uniques] | @csv' clones_raw.json >> data/traffic_history.csv
 
           # Add totals row
