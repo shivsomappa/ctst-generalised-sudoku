@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: write
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # future-proof Node.js warning
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # silence Node.js 20 warning
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
