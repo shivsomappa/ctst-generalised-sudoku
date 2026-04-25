@@ -56,11 +56,19 @@ jobs:
         run: |
           mkdir -p data
           echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
-          # Merge views and clones by index (same 14-day window)
-          paste -d, \
-            <(jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' traffic_raw.json) \
-            <(jq -r '.clones[] | [.count, .uniques] | @csv' clones_raw.json) \
-            >> data/traffic_history.csv
+
+          # Extract clones into a temporary file keyed by timestamp
+          jq -r '.clones[] | [.timestamp, .count, .uniques] | @csv' clones_raw.json > clones.csv
+
+          # Loop through views and join with clones by date
+          while IFS=, read -r date views uniques; do
+            clean_date=$(echo $date | tr -d '"')
+            clone_row=$(grep $clean_date clones.csv || echo ",,")
+            clone_count=$(echo $clone_row | cut -d, -f2)
+            clone_uniques=$(echo $clone_row | cut -d, -f3)
+            echo "$clean_date,$views,$uniques,$clone_count,$clone_uniques" >> data/traffic_history.csv
+          done < <(jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' traffic_raw.json)
+
           cat data/traffic_history.csv
 
       - name: Commit CSV to repo
