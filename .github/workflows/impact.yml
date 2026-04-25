@@ -1,80 +1,22 @@
-name: Fetch Traffic History
+- name: Convert to CSV
+  run: |
+    mkdir -p data
+    echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
 
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'   # runs daily at midnight UTC
+    # Build a combined JSON keyed by date
+    jq -s '
+      {
+        views: (.[0].views | map({date: .timestamp, views: .count, unique_views: .uniques})),
+        clones: (.[1].clones | map({date: .timestamp, clones: .count, unique_clones: .uniques}))
+      }
+      | .views
+      | map(
+          . + (
+            (.date as $d | (.. | objects | select(.date==$d))) // {}
+          )
+        )
+    ' traffic_raw.json clones_raw.json \
+    | jq -r '.[] | [.date, .views, .unique_views, (.clones // ""), (.unique_clones // "")] | @csv' \
+    >> data/traffic_history.csv
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
-jobs:
-  fetch-traffic:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Fetch views data
-        env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
-        run: |
-          curl -f -H "Authorization: token $GH_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               https://api.github.com/repos/${{ github.repository }}/traffic/views \
-               -o traffic_raw.json
-          echo "--- RAW VIEWS RESPONSE ---"
-          cat traffic_raw.json
-
-      - name: Fetch clones data
-        env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
-        run: |
-          curl -f -H "Authorization: token $GH_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               https://api.github.com/repos/${{ github.repository }}/traffic/clones \
-               -o clones_raw.json
-          echo "--- RAW CLONES RESPONSE ---"
-          cat clones_raw.json
-
-      - name: Debug API responses
-        env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_TOKEN }}
-        run: |
-          echo "Views headers:"
-          curl -i -H "Authorization: token $GH_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               https://api.github.com/repos/${{ github.repository }}/traffic/views
-          echo "Clones headers:"
-          curl -i -H "Authorization: token $GH_TOKEN" \
-               -H "Accept: application/vnd.github+json" \
-               https://api.github.com/repos/${{ github.repository }}/traffic/clones
-
-      - name: Convert to CSV
-        run: |
-          mkdir -p data
-          echo "date,views,unique_views,clones,unique_clones" > data/traffic_history.csv
-
-          # Extract clones into a temporary file keyed by timestamp
-          jq -r '.clones[] | [.timestamp, .count, .uniques] | @csv' clones_raw.json > clones.csv
-
-          # Loop through views and join with clones by date
-          while IFS=, read -r date views uniques; do
-            clean_date=$(echo $date | tr -d '"')
-            clone_row=$(grep $clean_date clones.csv || echo ",,")
-            clone_count=$(echo $clone_row | cut -d, -f2)
-            clone_uniques=$(echo $clone_row | cut -d, -f3)
-            echo "$clean_date,$views,$uniques,$clone_count,$clone_uniques" >> data/traffic_history.csv
-          done < <(jq -r '.views[] | [.timestamp, .count, .uniques] | @csv' traffic_raw.json)
-
-          cat data/traffic_history.csv
-
-      - name: Commit CSV to repo
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add data/traffic_history.csv
-          git commit -m "Update traffic history" || echo "No changes to commit"
-          git push
+    cat data/traffic_history.csv
