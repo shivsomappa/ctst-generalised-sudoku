@@ -176,7 +176,7 @@ int SOLVE_SUDOKU(Grid3D& p_OT,Grid2D& p_table, Grid2D& s_table, Grid2D& t_table,
 
 		if (flag >0)
 		{
-			filter_symbol_cts_method(p_OT, t_table, p_temp_1, p_temp_2, size, blk_size, max_set, pid-1, stat_data);
+			filter_symbol_cts_method(p_OT, t_table, p_temp_1, p_temp_2, size, blk_size, max_set, pid+1, stat_data);
 		}
 		flag = check_process_halt(p_OT, p_table, s_table, t_table, size, set_2, set_3);
 		cout << stat_data[3] << "             " << stat_data[1] << "                         " <<stat_data[2]<<"  "<< '\r';
