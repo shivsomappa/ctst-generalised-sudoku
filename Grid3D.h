@@ -1,3 +1,16 @@
+// =============================================================================
+// Grid3D.h
+// Contiguous 3-D integer array backed by a flat std::vector.
+// Memory layout: row-major (C order).
+//
+// Usage in this project:
+//   Grid2D – puzzle_board, solution_board, stats_board, tally_buf, work_buf
+//   Grid3D – opt_tbl (options / candidate table for each board cell)
+//
+// operator()(i, j, k) – fast unchecked access
+// at(i, j, k)         – bounds-checked access (throws out_of_range)
+// =============================================================================
+
 #pragma once
 #include <vector>
 #include <stdexcept>
