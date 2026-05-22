@@ -1,25 +1,45 @@
+// =============================================================================
+// Create_sudoku_M3.cpp
+// Puzzle generation method M3.
+//
+// Fills puzzle_board (the clue grid visible to the solver) and solution_board
+// (the complete, correct answer grid) using generation strategy 3:
+//   M1 – starts from a cyclic template, shifts rows/columns within blocks,
+//         then removes symbols to expose key cells.
+//   M2 – similar to M1 but uses a different key-cell selection policy.
+//   M3 – generates with minimum initial symbols; partially implements Sudoku
+//         properties before key-cell creation.
+//   M4 – completely random initial symbol placement.
+//
+// Internal nomenclature:
+//   opt_tbl      (Grid3D) – options / candidate table, same layout as filters.h
+//   puzzle_board (Grid2D) – clue cells; 0 = empty
+//   solution_board(Grid2D)– complete solution
+//   block_size            – square root of board dimension (e.g. 3 for 9x9)
+// =============================================================================
+
 #include "gsv.h"
 
 
 
-int m3_Create_sudoku_template(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size);
-int m3_Randomise_sudoku_rc_shift(Grid2D& table,int size,int blk_size);
-int m3_Row_shift_within_blk(Grid2D& table,int size,int bx,int blk_size);
-int m3_Column_shift_within_blk(Grid2D& table,int size,int bx,int blk_size);
-int m3_select_least_count_block(Grid2D& p_table, int& x, int& y, int size, int blk_size);
+int m3_Create_sudoku_template(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size);
+int m3_Randomise_sudoku_rc_shift(Grid2D& table,int size,int block_size);
+int m3_Row_shift_within_blk(Grid2D& table,int size,int bx,int block_size);
+int m3_Column_shift_within_blk(Grid2D& table,int size,int bx,int block_size);
+int m3_select_least_count_block(Grid2D& puzzle_board, int& x, int& y, int size, int block_size);
 
-int m3_Implement_sudoku_property(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size);
-int m3_Remove_symbol_from_options_table(Grid3D& options_table,Grid2D& s_table,int size,int blk_size,int &counter);
-int m3_Remove_symbol_from_options_table_fx(Grid3D& options_table,int s,int x,int y,int size,int blk_size,int counter);
-int m3_Remove_multiple_solution_symbol(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int *temp,int size,int blk_size);
+int m3_Implement_sudoku_property(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size);
+int m3_Remove_symbol_from_options_table(Grid3D& opt_tbl,Grid2D& solution_board,int size,int block_size,int &counter);
+int m3_Remove_symbol_from_options_table_fx(Grid3D& opt_tbl,int s,int x,int y,int size,int block_size,int counter);
+int m3_Remove_multiple_solution_symbol(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int *temp,int size,int block_size);
 
-int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size);
-int m3_set_info(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size,int &set2,int &set3);
+int m3_Build_Options_table(Grid2D& puzzle_board,Grid3D& opt_tbl,int size);
+int m3_set_info(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size,int &set2,int &set3);
 int m3_Find_max_min_counts(int *temp,int &max_s,int &min_s,int size);
 
-int m3_select_max_size_set(Grid3D& options_table,Grid2D& p_table, Grid2D& s_table,int* temp, int size,int blk_size, int &x,int &y);
-int select_max_options_count_symbol(Grid3D& options_table, Grid2D& s_table, int* temp, int x, int y, int size);
-int m3_Create_two_symbol_set(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int *temp,int x,int y,int size,int blk_size);
+int m3_select_max_size_set(Grid3D& opt_tbl,Grid2D& puzzle_board, Grid2D& solution_board,int* temp, int size,int block_size, int &x,int &y);
+int select_max_options_count_symbol(Grid3D& opt_tbl, Grid2D& solution_board, int* temp, int x, int y, int size);
+int m3_Create_two_symbol_set(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int *temp,int x,int y,int size,int block_size);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,20 +49,20 @@ int m3_Create_two_symbol_set(Grid3D& options_table,Grid2D& p_table,Grid2D& s_tab
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_GENERAT_SUDOKU_METHOD(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size)
+int m3_GENERAT_SUDOKU_METHOD(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size)
 {
 
-	m3_Create_sudoku_template(options_table,p_table,s_table,size,blk_size);
+	m3_Create_sudoku_template(opt_tbl,puzzle_board,solution_board,size,block_size);
 	cout<<"Sudoku board created implementing multiple solution properties "<<endl;
-	m3_Build_Options_table(p_table,options_table,size);
-	m3_Implement_sudoku_property(options_table,p_table,s_table,size,blk_size);
-	m3_Build_Options_table(p_table,options_table,size);
+	m3_Build_Options_table(puzzle_board,opt_tbl,size);
+	m3_Implement_sudoku_property(opt_tbl,puzzle_board,solution_board,size,block_size);
+	m3_Build_Options_table(puzzle_board,opt_tbl,size);
 	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Create_sudoku_template(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size)
+int m3_Create_sudoku_template(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size)
 {
 	int i=0,j=0,k=0,start=0,end=0,x,y;
 	int count1=0,count2=size*size*10/100;
@@ -65,8 +85,8 @@ int m3_Create_sudoku_template(Grid3D& options_table,Grid2D& p_table,Grid2D& s_ta
 	//create sudoku -spiral shift method
 	for(j=0;j<size;j++)
 	{
-		for(i=0;i<size;i++){s_table(i,j)=temp[i];}
-		if((j+1)%blk_size==0)
+		for(i=0;i<size;i++){solution_board(i,j)=temp[i];}
+		if((j+1)%block_size==0)
 		{
 			start=1;i=0;
 			while(start<size){temp1[start]=temp[i];start++;i++;}
@@ -75,26 +95,26 @@ int m3_Create_sudoku_template(Grid3D& options_table,Grid2D& p_table,Grid2D& s_ta
 		}
 		else
 		{
-			start=blk_size;i=0;
+			start=block_size;i=0;
 			while(start<size){temp1[start]=temp[i];start++;i++;}
 			start=0;while(i<size){temp1[start]=temp[i];i++;start++;}
 		}
 		for(i=0;i<size;i++){temp[i]=temp1[i];}
 	}
-	//initialisze p_table
-	m3_Randomise_sudoku_rc_shift(s_table, size, blk_size);
-	//copy sudoku to s_table
-	for(i=0;i<size;i++){for(j=0;j<size;j++){p_table(i,j)=0;}}
-	//copy 10% symbol to p_table
+	//initialisze puzzle_board
+	m3_Randomise_sudoku_rc_shift(solution_board, size, block_size);
+	//copy sudoku to solution_board
+	for(i=0;i<size;i++){for(j=0;j<size;j++){puzzle_board(i,j)=0;}}
+	//copy 10% symbol to puzzle_board
 	srand(time(0));
 	while(count1<count2)
 	{
-		x=rand()%blk_size;
-		y=rand()%blk_size;
-		m3_select_least_count_block(p_table, x, y, size, blk_size);
-		if(p_table(x,y)==0)
+		x=rand()%block_size;
+		y=rand()%block_size;
+		m3_select_least_count_block(puzzle_board, x, y, size, block_size);
+		if(puzzle_board(x,y)==0)
 		{
-			p_table(x,y)=s_table(x,y);
+			puzzle_board(x,y)=solution_board(x,y);
 			count1++;
 		}
 		
@@ -106,22 +126,22 @@ int m3_Create_sudoku_template(Grid3D& options_table,Grid2D& p_table,Grid2D& s_ta
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_select_least_count_block(Grid2D& p_table, int& x, int& y, int size, int blk_size)
+int m3_select_least_count_block(Grid2D& puzzle_board, int& x, int& y, int size, int block_size)
 {
-	int i, j, X = x, Y = y, count = blk_size * blk_size, bx, by, c;
+	int i, j, X = x, Y = y, count = block_size * block_size, bx, by, c;
 
-	for (bx = 0; bx < size; bx = bx + blk_size)
+	for (bx = 0; bx < size; bx = bx + block_size)
 	{
-		for (by = 0; by < size; by = by + blk_size)
+		for (by = 0; by < size; by = by + block_size)
 		{
-			if (p_table(bx + X,by + Y) == 0)
+			if (puzzle_board(bx + X,by + Y) == 0)
 			{
 				c = 0;
-				for (i = bx; i < bx + blk_size; i++)
+				for (i = bx; i < bx + block_size; i++)
 				{
-					for (j = by; j < by + blk_size; j++)
+					for (j = by; j < by + block_size; j++)
 					{
-						if (p_table(i,j) > 0) { c++; }
+						if (puzzle_board(i,j) > 0) { c++; }
 					}
 
 				}
@@ -141,30 +161,30 @@ int m3_select_least_count_block(Grid2D& p_table, int& x, int& y, int size, int b
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Randomise_sudoku_rc_shift(Grid2D& table,int size,int blk_size)
+int m3_Randomise_sudoku_rc_shift(Grid2D& table,int size,int block_size)
 {
 	int i=0;
-	for(i=0;i<size;i=i+blk_size)
+	for(i=0;i<size;i=i+block_size)
 	{
-		m3_Row_shift_within_blk(table, size,i, blk_size);
+		m3_Row_shift_within_blk(table, size,i, block_size);
 	}
 
-	for(i=0;i<size;i=i+blk_size)
+	for(i=0;i<size;i=i+block_size)
 	{
-		m3_Column_shift_within_blk(table, size,i, blk_size);
+		m3_Column_shift_within_blk(table, size,i, block_size);
 	}
 
 	return 0;
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Row_shift_within_blk(Grid2D& table,int size,int bx,int blk_size)
+int m3_Row_shift_within_blk(Grid2D& table,int size,int bx,int block_size)
 {
 	int x,i,j,s;
 	
-	for(i=bx;i<bx+blk_size;i++)
+	for(i=bx;i<bx+block_size;i++)
 	{
-		x=rand()%blk_size+bx;
+		x=rand()%block_size+bx;
 		if(x!=i)
 		{
 			for(j=0;j<size;j++){s=table(i,j);table(i,j)=table(x,j);table(x,j)=s;}
@@ -174,13 +194,13 @@ int m3_Row_shift_within_blk(Grid2D& table,int size,int bx,int blk_size)
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Column_shift_within_blk(Grid2D& table,int size,int by,int blk_size)
+int m3_Column_shift_within_blk(Grid2D& table,int size,int by,int block_size)
 {
 	int y,i,j,s;
 
-	for(j=by;j<by+blk_size;j++)
+	for(j=by;j<by+block_size;j++)
 	{
-		y=rand()%blk_size+by;
+		y=rand()%block_size+by;
 		if(y!=j)
 		{
 			for(i=0;i<size;i++){s=table(i,j);table(i,j)=table(i,y);table(i,y)=s;}
@@ -193,7 +213,7 @@ int m3_Column_shift_within_blk(Grid2D& table,int size,int by,int blk_size)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Implement_sudoku_property(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size)
+int m3_Implement_sudoku_property(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size)
 {
 	int flag=0,set2_count=0,set3_count=2;
 	int x, y;
@@ -204,20 +224,20 @@ int m3_Implement_sudoku_property(Grid3D& options_table,Grid2D& p_table,Grid2D& s
 	
 	while(set3_count>0)
 	{
-		m3_set_info(options_table, p_table,  s_table,  size, blk_size,  set2_count, set3_count);
+		m3_set_info(opt_tbl, puzzle_board,  solution_board,  size, block_size,  set2_count, set3_count);
 		if(set3_count>1)
 		{
 			if(set2_count==0)
 			{
-				m3_select_max_size_set(options_table,p_table, s_table, temp, size, blk_size,  x, y);
+				m3_select_max_size_set(opt_tbl,puzzle_board, solution_board, temp, size, block_size,  x, y);
 				if(x>-1)
 				{
-					m3_Create_two_symbol_set(options_table,p_table,s_table, temp, x, y, size, blk_size);
+					m3_Create_two_symbol_set(opt_tbl,puzzle_board,solution_board, temp, x, y, size, block_size);
 				}
 			}
 			else if(set2_count>0)
 			{
-				m3_Remove_symbol_from_options_table(options_table,s_table,size, blk_size, counter);
+				m3_Remove_symbol_from_options_table(opt_tbl,solution_board,size, block_size, counter);
 			}
 		}
 	}
@@ -227,7 +247,7 @@ int m3_Implement_sudoku_property(Grid3D& options_table,Grid2D& p_table,Grid2D& s
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_select_max_size_set(Grid3D& options_table,Grid2D& p_table, Grid2D& s_table, int* temp, int size, int blk_size,int &x,int &y)
+int m3_select_max_size_set(Grid3D& opt_tbl,Grid2D& puzzle_board, Grid2D& solution_board, int* temp, int size, int block_size,int &x,int &y)
 {
 	int i=0,j,  counter=0 , lss = 0;
 	x=-1;y=-1;
@@ -236,20 +256,20 @@ int m3_select_max_size_set(Grid3D& options_table,Grid2D& p_table, Grid2D& s_tabl
 	{
 		for(j=0;j<size;j++)
 		{
-			if (options_table(i,j,0) > 0)
+			if (opt_tbl(i,j,0) > 0)
 			{
-				if (options_table(i,j,0) > lss)
+				if (opt_tbl(i,j,0) > lss)
 				{
-					lss = options_table(i,j,0);
-					counter = options_table(i,j,size + 1);
+					lss = opt_tbl(i,j,0);
+					counter = opt_tbl(i,j,size + 1);
 					x = i; y = j;
 				}
-				else if (options_table(i,j,0) == lss)
+				else if (opt_tbl(i,j,0) == lss)
 				{
-					if (options_table(i,j,size + 1) > counter)
+					if (opt_tbl(i,j,size + 1) > counter)
 					{
-						lss = options_table(i,j,0);
-						counter = options_table(i,j,size + 1);
+						lss = opt_tbl(i,j,0);
+						counter = opt_tbl(i,j,size + 1);
 						x = i; y = j;
 					}
 				}
@@ -268,28 +288,28 @@ int m3_select_max_size_set(Grid3D& options_table,Grid2D& p_table, Grid2D& s_tabl
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Create_two_symbol_set(Grid3D& options_table, Grid2D& p_table, Grid2D& s_table, int* temp, int x, int y, int size, int blk_size)
+int m3_Create_two_symbol_set(Grid3D& opt_tbl, Grid2D& puzzle_board, Grid2D& solution_board, int* temp, int x, int y, int size, int block_size)
 {
 	int i, j, k, x1, y1, c1, c2, f;
-	int s1 = s_table(x,y), s2;
+	int s1 = solution_board(x,y), s2;
 	int set_sum1 = 0, set_sum2 = 0;
-	int bx = (x / blk_size) * blk_size, by = (y / blk_size) * blk_size;
+	int bx = (x / block_size) * block_size, by = (y / block_size) * block_size;
 	int t = 0;
 
-	while (options_table(x,y,0) > 2)
+	while (opt_tbl(x,y,0) > 2)
 	{
 		t++;
 		c1 = 0, s2 = 0; f = 0;
 		set_sum1 = 0;
 		for (k = 1; k < size + 1; k++)
 		{
-			if (k != s1 && options_table(x,y,k) > 0)
+			if (k != s1 && opt_tbl(x,y,k) > 0)
 			{
 				c2 = 0; set_sum2 = 0;
 				for (j = 0; j < size; j++)
 				{
-					set_sum2 = set_sum2 + options_table(x,j,0);
-					if (options_table(x,j,k) > 0) { c2++; }
+					set_sum2 = set_sum2 + opt_tbl(x,j,0);
+					if (opt_tbl(x,j,k) > 0) { c2++; }
 				}
 
 				if (c2 > c1 || (c2 == c1 && set_sum2 > set_sum1)) { c1 = c2; set_sum1 = set_sum2; s2 = k; f = 0; }
@@ -297,19 +317,19 @@ int m3_Create_two_symbol_set(Grid3D& options_table, Grid2D& p_table, Grid2D& s_t
 				c2 = 0; set_sum2 = 0;
 				for (i = 0; i < size; i++)
 				{
-					set_sum2 = set_sum2 + options_table(i,y,0);
-					if (options_table(i,y,k) > 0) { c2++; }
+					set_sum2 = set_sum2 + opt_tbl(i,y,0);
+					if (opt_tbl(i,y,k) > 0) { c2++; }
 				}
 
 				if (c2 > c1 || (c2 == c1 && set_sum2 > set_sum1)) { c1 = c2; set_sum1 = set_sum2; s2 = k; f = 1; }
 				//***********************************
 				c2 = 0; set_sum2 = 0;
-				for (i = bx; i < bx + blk_size; i++)
+				for (i = bx; i < bx + block_size; i++)
 				{
-					for (j = by; j < by + blk_size; j++)
+					for (j = by; j < by + block_size; j++)
 					{
-						set_sum2 = set_sum2 + options_table(i,j,0);
-						if (options_table(i,j,k) > 0) { c2++; }
+						set_sum2 = set_sum2 + opt_tbl(i,j,0);
+						if (opt_tbl(i,j,k) > 0) { c2++; }
 					}
 				}
 				if (c2 > c1 || (c2 == c1 && set_sum2 > set_sum1)) { c1 = c2; set_sum1 = set_sum2; s2 = k; f = 2; }
@@ -319,23 +339,23 @@ int m3_Create_two_symbol_set(Grid3D& options_table, Grid2D& p_table, Grid2D& s_t
 
 		if (f == 0)
 		{
-			j = 0; while (s_table(x,j) != s2) { j++; }
+			j = 0; while (solution_board(x,j) != s2) { j++; }
 			x1 = x; y1 = j;
 		}
 		else if (f == 1)
 		{
-			i = 0; while (s_table(i,y) != s2) { i++; }
+			i = 0; while (solution_board(i,y) != s2) { i++; }
 			x1 = i; y1 = y;
 		}
 		else
 		{
-			for (i = bx; i < bx + blk_size; i++)
+			for (i = bx; i < bx + block_size; i++)
 			{
-				for (j = by; j < by + blk_size; j++) { if (s_table(i,j) == s2) { x1 = i; y1 = j; } }
+				for (j = by; j < by + block_size; j++) { if (solution_board(i,j) == s2) { x1 = i; y1 = j; } }
 			}
 		}
-		p_table(x1,y1) = s_table(x1,y1);
-		m3_Remove_symbol_from_options_table_fx(options_table, s2, x1, y1, size, blk_size, 0);
+		puzzle_board(x1,y1) = solution_board(x1,y1);
+		m3_Remove_symbol_from_options_table_fx(opt_tbl, s2, x1, y1, size, block_size, 0);
 
 	}
 	return 0;
@@ -349,7 +369,7 @@ int m3_Create_two_symbol_set(Grid3D& options_table, Grid2D& p_table, Grid2D& s_t
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Remove_symbol_from_options_table(Grid3D& options_table,Grid2D& s_table,int size,int blk_size,int &counter)
+int m3_Remove_symbol_from_options_table(Grid3D& opt_tbl,Grid2D& solution_board,int size,int block_size,int &counter)
 {
 	int i=0,j=0,k=0,s,flag=1;
 
@@ -360,13 +380,13 @@ int m3_Remove_symbol_from_options_table(Grid3D& options_table,Grid2D& s_table,in
 		{
 			for(j=0;j<size;j++)
 			{
-				if(options_table(i,j,0)==1||options_table(i,j,0)==2)
+				if(opt_tbl(i,j,0)==1||opt_tbl(i,j,0)==2)
 				{
-					flag=1;s=s_table(i,j);
-					for(k=0;k<size+1;k++){options_table(i,j,k)=0;}
-					options_table(i,j,size+1)=counter;
+					flag=1;s=solution_board(i,j);
+					for(k=0;k<size+1;k++){opt_tbl(i,j,k)=0;}
+					opt_tbl(i,j,size+1)=counter;
 					counter++;
-					m3_Remove_symbol_from_options_table_fx(options_table,s,i,j,size,blk_size,options_table(i,j,size+1));
+					m3_Remove_symbol_from_options_table_fx(opt_tbl,s,i,j,size,block_size,opt_tbl(i,j,size+1));
 				}
 			}
 		}
@@ -376,17 +396,17 @@ int m3_Remove_symbol_from_options_table(Grid3D& options_table,Grid2D& s_table,in
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Remove_symbol_from_options_table_fx(Grid3D& options_table,int s,int x,int y,int size,int blk_size,int counter)
+int m3_Remove_symbol_from_options_table_fx(Grid3D& opt_tbl,int s,int x,int y,int size,int block_size,int counter)
 {
 	int i,j;
-	int bx=(x/blk_size)*blk_size,by=(y/blk_size)*blk_size;
+	int bx=(x/block_size)*block_size,by=(y/block_size)*block_size;
 	//hrz
 	for(i=0;i<size;i++)
 	{
-		if(options_table(x,i,s)>0)
+		if(opt_tbl(x,i,s)>0)
 		{
-			options_table(x,i,s)=0;options_table(x,i,0)--;
-			options_table(x,i,size+1)=counter;
+			opt_tbl(x,i,s)=0;opt_tbl(x,i,0)--;
+			opt_tbl(x,i,size+1)=counter;
 		}
 	}
 
@@ -394,19 +414,19 @@ int m3_Remove_symbol_from_options_table_fx(Grid3D& options_table,int s,int x,int
 	for(i=0;i<size;i++)
 	{
 
-		if(options_table(i,y,s)>0)
+		if(opt_tbl(i,y,s)>0)
 		{
-			options_table(i,y,s)=0;options_table(i,y,0)--;
+			opt_tbl(i,y,s)=0;opt_tbl(i,y,0)--;
 		}
 	}
 	//block
-	for(i=bx;i<bx+blk_size;i++)
+	for(i=bx;i<bx+block_size;i++)
 	{
-		for(j=by;j<by+blk_size;j++)
+		for(j=by;j<by+block_size;j++)
 		{
-			if(options_table(i,j,s)>0)
+			if(opt_tbl(i,j,s)>0)
 			{
-				options_table(i,j,s)=0;options_table(i,j,0)--;
+				opt_tbl(i,j,s)=0;opt_tbl(i,j,0)--;
 			}
 		}
 	}
@@ -420,7 +440,7 @@ int m3_Remove_symbol_from_options_table_fx(Grid3D& options_table,int s,int x,int
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size)
+int m3_Build_Options_table(Grid2D& puzzle_board,Grid3D& opt_tbl,int size)
 {
 	int i=0,j=0,k=0,l=0,s=0,bx=0,by=0,bl=int(sqrt(size));
 	//initalise
@@ -430,10 +450,10 @@ int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size)
 		{
 			for(k=0;k<size+1;k++)
 			{
-				if(p_table(i,j)==0){options_table(i,j,k)=k;options_table(i,j,0)=size;}
-				else{options_table(i,j,k)=0;}
+				if(puzzle_board(i,j)==0){opt_tbl(i,j,k)=k;opt_tbl(i,j,0)=size;}
+				else{opt_tbl(i,j,k)=0;}
 			}
-			options_table(i,j,size+1)=0;
+			opt_tbl(i,j,size+1)=0;
 		}
 	}
 	//***********************************************
@@ -444,16 +464,16 @@ int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size)
 			//horizotal maping
 			for(k=0;k<size;k++)
 			{
-				s=p_table(i,k);
-				if(s>0&&options_table(i,j,0)>0)
-				{options_table(i,j,s)=0;options_table(i,j,0)--;}
+				s=puzzle_board(i,k);
+				if(s>0&&opt_tbl(i,j,0)>0)
+				{opt_tbl(i,j,s)=0;opt_tbl(i,j,0)--;}
 			}
 			//verticle maping
 			for(k=0;k<size;k++)
 			{
-				s=p_table(k,j);
-				if(s>0&&options_table(i,j,s)>0&&options_table(i,j,0)>0)
-				{options_table(i,j,s)=0;options_table(i,j,0)--;}
+				s=puzzle_board(k,j);
+				if(s>0&&opt_tbl(i,j,s)>0&&opt_tbl(i,j,0)>0)
+				{opt_tbl(i,j,s)=0;opt_tbl(i,j,0)--;}
 			}
 			//block maping
 			bx=(i/bl)*bl;by=(j/bl)*bl;
@@ -461,9 +481,9 @@ int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size)
 			{
 				for(l=by;l<by+bl;l++)
 				{
-					s=p_table(k,l);
-					if(s>0&&options_table(i,j,s)>0&&options_table(i,j,0)>0)
-					{options_table(i,j,s)=0;options_table(i,j,0)--;}
+					s=puzzle_board(k,l);
+					if(s>0&&opt_tbl(i,j,s)>0&&opt_tbl(i,j,0)>0)
+					{opt_tbl(i,j,s)=0;opt_tbl(i,j,0)--;}
 				}				
 			}
 		}
@@ -478,7 +498,7 @@ int m3_Build_Options_table(Grid2D& p_table,Grid3D& options_table,int size)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-int m3_set_info(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,int blk_size,int &set2,int &set3)
+int m3_set_info(Grid3D& opt_tbl,Grid2D& puzzle_board,Grid2D& solution_board,int size,int block_size,int &set2,int &set3)
 {
 	int i,j,k,c1=0,c2=0,s;
 	set2=0;set3=0;
@@ -487,13 +507,13 @@ int m3_set_info(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,i
 	{
 		for(j=0;j<size;j++)
 		{
-			if(options_table(i,j,0)>0)
+			if(opt_tbl(i,j,0)>0)
 			{
-				if(options_table(i,j,0)<3){set2++;}
-				else if(options_table(i,j,0)>2)
+				if(opt_tbl(i,j,0)<3){set2++;}
+				else if(opt_tbl(i,j,0)>2)
 				{
 					c2++;
-					if(options_table(i,j,0)!=c1){c1=options_table(i,j,0);set3++;}
+					if(opt_tbl(i,j,0)!=c1){c1=opt_tbl(i,j,0);set3++;}
 				}
 			}
 		}
@@ -508,12 +528,12 @@ int m3_set_info(Grid3D& options_table,Grid2D& p_table,Grid2D& s_table,int size,i
 		{
 			for(j=0;j<size;j++)
 			{
-				if(options_table(i,j,0)>0)
+				if(opt_tbl(i,j,0)>0)
 				{
-					s=s_table(i,j);
-					p_table(i,j)=s;
-					for(k=0;k<size+1;k++){options_table(i,j,k)=0;}
-					m3_Remove_symbol_from_options_table_fx(options_table,s,i,j,size,blk_size,0);
+					s=solution_board(i,j);
+					puzzle_board(i,j)=s;
+					for(k=0;k<size+1;k++){opt_tbl(i,j,k)=0;}
+					m3_Remove_symbol_from_options_table_fx(opt_tbl,s,i,j,size,block_size,0);
 				}
 			}
 		}
