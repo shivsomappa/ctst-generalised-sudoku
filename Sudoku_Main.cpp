@@ -181,6 +181,7 @@ int SOLVE_SUDOKU(Grid3D& opt_tbl, Grid2D& puzzle_board, Grid2D& solution_board, 
             }
         }
     }
+     max_options= max_options+2;
     stats[0] = empty_cell_count; // store baseline empty-cell count
 
     // ── Allocate working buffers sized to the board ────────────────────────
